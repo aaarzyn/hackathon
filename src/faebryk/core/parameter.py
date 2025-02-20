@@ -368,7 +368,8 @@ class ParameterOperatable(Node):
         out = cast(set[T], self.operated_on.get_connected_nodes(types=[types]))
         if constrained_only:
             assert issubclass(types, ConstrainableExpression)
-            out = {i for i in out if cast(ConstrainableExpression, i).constrained}
+            out = {i for i in out if cast(
+                ConstrainableExpression, i).constrained}
         return out
 
     def get_literal(self, op: type["ConstrainableExpression"] | None = None) -> Literal:
@@ -468,7 +469,8 @@ class ParameterOperatable(Node):
             mapping: dict["Parameter", int] = field(default_factory=dict)
             next_id: int = 0
 
-        variable_mapping: VariableMapping = field(default_factory=VariableMapping)
+        variable_mapping: VariableMapping = field(
+            default_factory=VariableMapping)
 
         def __hash__(self) -> int:
             return hash(id(self))
@@ -900,7 +902,8 @@ class Arithmetic(Expression):
         # FIXME: convert to Quantity
 
         # TODO enforce
-        self.operands = cast(tuple[ParameterOperatable.NumberLike, ...], operands)
+        self.operands = cast(
+            tuple[ParameterOperatable.NumberLike, ...], operands)
 
     def __postinit__(self):
         assert self.units is not None
@@ -1203,14 +1206,16 @@ class Logic(ConstrainableExpression):
         super().__init__(*operands)
         types = bool, BoolSet, Parameter, Logic, Predicate
         if any(not isinstance(op, types) for op in operands):
-            raise ValueError("operands must be bool, Parameter, Logic, or Predicate")
+            raise ValueError(
+                "operands must be bool, Parameter, Logic, or Predicate")
         if any(
             not isinstance(param.domain, Boolean)
             or not param.units.is_compatible_with(dimensionless)
             for param in operands
             if isinstance(param, Parameter)
         ):
-            raise ValueError("parameters must have domain Boolean without a unit")
+            raise ValueError(
+                "parameters must have domain Boolean without a unit")
 
 
 class And(Logic):
@@ -1369,7 +1374,8 @@ class Domain:
                 shared = Boolean()
             case EnumDomain():
                 if not isinstance(two, EnumDomain):
-                    raise ValueError("Enum domain cannot be mixed with other domains")
+                    raise ValueError(
+                        "Enum domain cannot be mixed with other domains")
                 if one.enum_t != two.enum_t:
                     raise ValueError("Enum domains must be of the same type")
                 shared = EnumDomain(one.enum_t)
@@ -1503,13 +1509,6 @@ class LessThan(NumericPredicate):
         placement=NumericPredicate.ReprStyle.Placement.INFIX_FIRST,
     )
 
-    def __init__(self, left, right):
-        # TODO we might allow it for integer domains at some point
-        raise NotImplementedError(
-            "'<' not supported, you very likely want to use '<=' instead"
-        )
-        super().__init__(left, right)
-
 
 class GreaterThan(NumericPredicate):
     REPR_STYLE = NumericPredicate.ReprStyle(
@@ -1546,7 +1545,8 @@ class SeticPredicate(Predicate):
         # TODO
         # if any(not isinstance(op, types) for op in self.operands):
         #    raise ValueError("operands must be Parameter or Set")
-        units = [HasUnit.get_units_or_dimensionless(op) for op in self.operands]
+        units = [HasUnit.get_units_or_dimensionless(
+            op) for op in self.operands]
         for u in units[1:]:
             if not units[0].is_compatible_with(u):
                 raise ValueError("all operands must have compatible units")
@@ -1611,16 +1611,16 @@ class R(Namespace):
 
     class Domains(Namespace):
         class ESeries(Namespace):
-            E6 = lambda: ESeries(ESeries.SeriesType.E6)  # noqa: E731
-            E12 = lambda: ESeries(ESeries.SeriesType.E12)  # noqa: E731
-            E24 = lambda: ESeries(ESeries.SeriesType.E24)  # noqa: E731
-            E48 = lambda: ESeries(ESeries.SeriesType.E48)  # noqa: E731
-            E96 = lambda: ESeries(ESeries.SeriesType.E96)  # noqa: E731
-            E192 = lambda: ESeries(ESeries.SeriesType.E192)  # noqa: E731
+            def E6(): return ESeries(ESeries.SeriesType.E6)  # noqa: E731
+            def E12(): return ESeries(ESeries.SeriesType.E12)  # noqa: E731
+            def E24(): return ESeries(ESeries.SeriesType.E24)  # noqa: E731
+            def E48(): return ESeries(ESeries.SeriesType.E48)  # noqa: E731
+            def E96(): return ESeries(ESeries.SeriesType.E96)  # noqa: E731
+            def E192(): return ESeries(ESeries.SeriesType.E192)  # noqa: E731
 
         class Numbers(Namespace):
             REAL = Numbers
-            NATURAL = lambda: Numbers(integer=True, negative=False)  # noqa: E731
+            def NATURAL(): return Numbers(integer=True, negative=False)  # noqa: E731
 
         BOOL = Boolean
         ENUM = EnumDomain
@@ -1657,7 +1657,8 @@ class R(Namespace):
 
 
 class Parameter(ParameterOperatable):
-    class TraitT(Trait): ...
+    class TraitT(Trait):
+        ...
 
     def __init__(
         self,
@@ -1768,7 +1769,8 @@ class Parameter(ParameterOperatable):
         return self.domain.unbounded(self)
 
     def get_last_known_deduced_superset(self, solver: "Solver") -> P_Set | None:
-        as_literal = solver.inspect_get_known_supersets(self, force_update=False)
+        as_literal = solver.inspect_get_known_supersets(
+            self, force_update=False)
         return None if as_literal == self.domain_set() else as_literal
 
 
@@ -1778,7 +1780,7 @@ p_field = f_field(Parameter)
 CanonicalNumericExpression = Add | Multiply | Power | Round | Abs | Sin | Log
 CanonicalLogicExpression = Or | Not
 CanonicalSeticExpression = Intersection | Union | SymmetricDifference
-CanonicalPredicate = GreaterOrEqual | IsSubset | Is | GreaterThan
+CanonicalPredicate = GreaterOrEqual | IsSubset | Is | GreaterThan | LessOrEqual | LessThan
 
 CanonicalConstrainableExpression = CanonicalLogicExpression | CanonicalPredicate
 

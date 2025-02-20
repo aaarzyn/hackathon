@@ -58,7 +58,8 @@ from faebryk.libs.util import cast_assert
 
 logger = logging.getLogger(__name__)
 
-NumericLiteralR = (*QuantityLikeR, Quantity_Interval_Disjoint, Quantity_Interval)
+NumericLiteralR = (
+    *QuantityLikeR, Quantity_Interval_Disjoint, Quantity_Interval)
 
 
 @algorithm("Constrain within and domain", single=True, destructive=False)
@@ -68,7 +69,8 @@ def constrain_within_domain(mutator: Mutator):
     """
 
     for param in mutator.nodes_of_type(Parameter):
-        new_param = mutator.mutate_parameter(param, override_within=True, within=None)
+        new_param = mutator.mutate_parameter(
+            param, override_within=True, within=None)
         if param.within is not None:
             subset_to(new_param, param.within, mutator, from_ops=[param])
         subset_to(
@@ -113,13 +115,15 @@ def convert_to_canonical_literals(mutator: Mutator):
                 po,
                 units=dimensionless,
                 soft_set=Quantity_Interval_Disjoint._from_intervals(
-                    Quantity_Interval_Disjoint.from_value(po.soft_set)._intervals,
+                    Quantity_Interval_Disjoint.from_value(
+                        po.soft_set)._intervals,
                     dimensionless,
                 )
                 if po.soft_set is not None
                 else None,
                 within=Quantity_Interval_Disjoint._from_intervals(
-                    Quantity_Interval_Disjoint.from_value(po.within)._intervals,
+                    Quantity_Interval_Disjoint.from_value(
+                        po.within)._intervals,
                     dimensionless,
                 )
                 if po.within is not None
@@ -161,7 +165,8 @@ def convert_to_canonical_literals(mutator: Mutator):
 
             # need to ignore existing because non-canonical literals
             # are congruent to canonical
-            mutator.mutate_expression_with_op_map(po, mutate, ignore_existing=True)
+            mutator.mutate_expression_with_op_map(
+                po, mutate, ignore_existing=True)
 
 
 @algorithm("Canonical expression form", single=True, destructive=False)
@@ -183,10 +188,11 @@ def convert_to_canonical_operations(mutator: Mutator):
     ```
     """
 
-    UnsupportedOperations: dict[type[Expression], type[Expression]] = {
-        GreaterThan: GreaterOrEqual,
-        LessThan: LessOrEqual,
-    }
+    UnsupportedOperations: dict[type[Expression], type[Expression]] = {}
+    # {
+    #     GreaterThan: GreaterOrEqual,
+    #     LessThan: LessOrEqual,
+    # }
 
     def c[T: CanonicalExpression](op: type[T], *operands) -> T:
         return mutator.create_expression(
@@ -232,12 +238,14 @@ def convert_to_canonical_operations(mutator: Mutator):
         (
             Add,
             Subtract,
-            lambda operands: [operands[0]] + [Multiply_(o, -1) for o in operands[1:]],
+            lambda operands: [operands[0]] +
+            [Multiply_(o, -1) for o in operands[1:]],
         ),
         (
             Multiply,
             Divide,
-            lambda operands: [operands[0]] + [Power_(o, -1) for o in operands[1:]],
+            lambda operands: [operands[0]] +
+            [Power_(o, -1) for o in operands[1:]],
         ),
         (
             Not,
@@ -253,7 +261,8 @@ def convert_to_canonical_operations(mutator: Mutator):
             Not,
             Xor,
             lambda operands: [
-                Or_(Not_(Or_(*operands)), Not_(Or_(*[Not_(o) for o in operands])))
+                Or_(Not_(Or_(*operands)),
+                    Not_(Or_(*[Not_(o) for o in operands])))
             ],
         ),
         (
@@ -278,21 +287,13 @@ def convert_to_canonical_operations(mutator: Mutator):
         ),
         (
             GreaterOrEqual,
-            LessOrEqual,
-            lambda operands: list(reversed(operands)),
-        ),
-        (
-            # GreaterThan,
-            # TODO
-            GreaterOrEqual,
             LessThan,
             lambda operands: list(reversed(operands)),
         ),
-        # TODO remove once support for LT/GT
         (
-            GreaterOrEqual,
+            LessOrEqual,
             GreaterThan,
-            lambda operands: operands,
+            lambda operands: list(reversed(operands)),
         ),
         (
             IsSubset,
@@ -335,9 +336,11 @@ def convert_to_canonical_operations(mutator: Mutator):
                 IsSubset, p, union, from_ops=from_ops, constrain=True
             )
             if isinstance(e, Min):
-                mutator.create_expression(GreaterOrEqual, union, p, from_ops=from_ops)
+                mutator.create_expression(
+                    GreaterOrEqual, union, p, from_ops=from_ops)
             else:
-                mutator.create_expression(GreaterOrEqual, p, union, from_ops=from_ops)
+                mutator.create_expression(
+                    GreaterOrEqual, p, union, from_ops=from_ops)
             mutator._mutate(e, p)
             continue
 

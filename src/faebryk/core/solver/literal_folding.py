@@ -21,6 +21,8 @@ from faebryk.core.parameter import (
     Intersection,
     Is,
     IsSubset,
+    LessThan,
+    LessOrEqual,
     Log,
     Multiply,
     Not,
@@ -90,7 +92,8 @@ def _collect_factors[T: Multiply | Power](
         counter.items()
     )
     # Store operations of type collect_type grouped by their non-literal operand
-    same_literal_factors: dict[ParameterOperatable, list[T]] = defaultdict(list)
+    same_literal_factors: dict[ParameterOperatable,
+                               list[T]] = defaultdict(list)
 
     # Look for operations matching collect_type and gather them
     for collect_op in set(factors.keys()):
@@ -180,7 +183,8 @@ def fold_add(
     # 6*A
     # (A * 2) + (A * 5)
 
-    literal_sum = _fold_op(literal_operands, lambda a, b: a + b, 0)  # type: ignore #TODO
+    literal_sum = _fold_op(literal_operands, lambda a,
+                           b: a + b, 0)  # type: ignore #TODO
 
     new_factors, old_factors = _collect_factors(
         replacable_nonliteral_operands, Multiply
@@ -227,9 +231,11 @@ def fold_multiply(
     non_replacable_nonliteral_operands: Sequence[ParameterOperatable],
     mutator: Mutator,
 ):
-    literal_prod = _fold_op(literal_operands, lambda a, b: a * b, 1)  # type: ignore #TODO
+    literal_prod = _fold_op(literal_operands, lambda a,
+                            b: a * b, 1)  # type: ignore #TODO
 
-    new_powers, old_powers = _collect_factors(replacable_nonliteral_operands, Power)
+    new_powers, old_powers = _collect_factors(
+        replacable_nonliteral_operands, Power)
 
     # if non-lit powers all 1 and no literal folding, nothing to do
     if (
@@ -452,7 +458,8 @@ def fold_not(
                 # should be handle in more general way
                 # maybe we need to terminate non-predicates too
                 if not op.operands:
-                    alias_is_literal_and_check_predicate_eval(expr, True, mutator)
+                    alias_is_literal_and_check_predicate_eval(
+                        expr, True, mutator)
                 for inner_op in op.operands:
                     # ¬(¬A v ...)
                     if isinstance(inner_op, Not):
@@ -587,7 +594,113 @@ def fold_ge(
                 )
             else:
                 assert right is lit
-                mutator.mutate_expression(expr, operands=[left, make_lit(lit.max_elem)])
+                mutator.mutate_expression(
+                    expr, operands=[left, make_lit(lit.max_elem)])
+        return
+
+
+def fold_gt(
+    expr: GreaterThan,
+    literal_operands: Sequence[Literal],
+    replacable_nonliteral_operands: Counter[ParameterOperatable],
+    non_replacable_nonliteral_operands: Sequence[ParameterOperatable],
+    mutator: Mutator,
+):
+    """
+    ```
+    A > A -> False
+    X > Y -> [True] / [False]
+    A >! X | |X| > 1 -> A >! X.max()
+    X >! A | |X| > 1 -> X.min() >! A
+    ```
+    """
+    left, right = expr.operands
+    literal_operands = cast(Sequence[CanonicalNumber], literal_operands)
+
+    # A >! X | |X| > 1 -> A >! X.max()
+    # X >! A | |X| > 1 -> X.min() >! A
+    if literal_operands and expr.constrained:
+        assert len(literal_operands) == 1
+        lit = literal_operands[0]
+        if not lit.is_single_element() and not lit.is_empty():
+            if left is lit:
+                mutator.mutate_expression(
+                    expr, operands=[make_lit(lit.min_elem), right]
+                )
+            else:
+                assert right is lit
+                mutator.mutate_expression(
+                    expr, operands=[left, make_lit(lit.max_elem)])
+        return
+
+
+def fold_lt(
+    expr: LessThan,
+    literal_operands: Sequence[Literal],
+    replacable_nonliteral_operands: Counter[ParameterOperatable],
+    non_replacable_nonliteral_operands: Sequence[ParameterOperatable],
+    mutator: Mutator,
+):
+    """
+    ```
+    A < A -> False
+    X < Y -> [True] / [False]
+    A <! X | |X| > 1 -> A <! X.min()
+    X <! A | |X| > 1 -> X.max() <! A
+    ```
+    """
+    left, right = expr.operands
+    literal_operands = cast(Sequence[CanonicalNumber], literal_operands)
+
+    # A <! X | |X| > 1 -> A <! X.min()
+    # X <! A | |X| > 1 -> X.max() <! A
+    if literal_operands and expr.constrained:
+        assert len(literal_operands) == 1
+        lit = literal_operands[0]
+        if not lit.is_single_element() and not lit.is_empty():
+            if left is lit:
+                mutator.mutate_expression(
+                    expr, operands=[make_lit(lit.max_elem), right]
+                )
+            else:
+                assert right is lit
+                mutator.mutate_expression(
+                    expr, operands=[left, make_lit(lit.min_elem)])
+        return
+
+
+def fold_le(
+    expr: LessOrEqual,
+    literal_operands: Sequence[Literal],
+    replacable_nonliteral_operands: Counter[ParameterOperatable],
+    non_replacable_nonliteral_operands: Sequence[ParameterOperatable],
+    mutator: Mutator,
+):
+    """
+    A <= B -> ¬(A > B)
+    A <= A -> True
+    X <= Y -> [True] / [False]
+    A <=! X | |X| > 1 -> A <=! X.max()
+    X <=! A | |X| > 1 -> X.min() <=! A
+    """
+    left, right = expr.operands
+    literal_operands = cast(Sequence[CanonicalNumber], literal_operands)
+
+    # A <=! X | |X| > 1 -> A <=! X.max()
+    # X <=! A | |X| > 1 -> X.min() <=! A
+    if literal_operands and expr.constrained:
+        assert len(literal_operands) == 1
+        lit = literal_operands[0]
+        if not lit.is_single_element() and not lit.is_empty():
+            if left is lit:
+                mutator.mutate_expression(
+                    expr, operands=[make_lit(lit.max_elem), right]
+                )
+            else:
+                assert right is lit
+                mutator.mutate_expression(
+                    expr, operands=[left, make_lit(lit.min_elem)]
+                )
         return
 
 
@@ -655,6 +768,9 @@ def fold(
         elif isinstance(expr, GreaterThan):
             # TODO implement
             return lambda *args: None
+        elif isinstance(expr, LessOrEqual):
+            return fold_le  # type: ignore
+
         elif isinstance(expr, IsSubset):
             return fold_subset  # type: ignore
         # Sets
@@ -716,7 +832,8 @@ def fold_literals(mutator: Mutator, expr_type: type[CanonicalExpression]):
             expr,
             literal_operands=list(literal_operands),
             replacable_nonliteral_operands=multiplicity,
-            non_replacable_nonliteral_operands=list(non_replacable_nonliteral_operands),
+            non_replacable_nonliteral_operands=list(
+                non_replacable_nonliteral_operands),
             mutator=mutator,
         )
 
@@ -759,6 +876,8 @@ _CanonicalExpressions = {
     Is: operator.eq,
     GreaterOrEqual: operator.ge,
     GreaterThan: operator.gt,
+    LessThan: operator.lt,
+    LessOrEqual: operator.le,
     IsSubset: P_Set.is_subset_of,
 }
 
@@ -794,4 +913,5 @@ def fold_pure_literal_expressions(mutator: Mutator):
 
         result = _exec_pure_literal_expressions(expr)
         # type ignore because function sig is not 100% correct
-        alias_is_literal_and_check_predicate_eval(expr, result, mutator)  # type: ignore
+        alias_is_literal_and_check_predicate_eval(
+            expr, result, mutator)  # type: ignore

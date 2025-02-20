@@ -202,7 +202,8 @@ def test_subset_of_literal():
 
     solver = DefaultSolver()
     for p in (p0, p1, p2):
-        assert solver.inspect_get_known_supersets(p) == RangeWithGaps((0.0, 0.0))
+        assert solver.inspect_get_known_supersets(
+            p) == RangeWithGaps((0.0, 0.0))
 
 
 def test_alias_classes():
@@ -242,7 +243,8 @@ def test_inspect_known_superranges():
     p0 = Parameter(units=P.V, within=Range(1 * P.V, 10 * P.V))
     p0.alias_is(Range(1 * P.V, 3 * P.V) + Range(4 * P.V, 6 * P.V))
     solver = DefaultSolver()
-    assert solver.inspect_get_known_supersets(p0) == RangeWithGaps((5 * P.V, 9 * P.V))
+    assert solver.inspect_get_known_supersets(
+        p0) == RangeWithGaps((5 * P.V, 9 * P.V))
 
 
 def test_obvious_contradiction_by_literal():
@@ -261,7 +263,8 @@ def test_obvious_contradiction_by_literal():
 
 
 def test_subset_is():
-    A, B = params = times(2, lambda: Parameter(domain=L.Domains.Numbers.REAL()))
+    A, B = params = times(2, lambda: Parameter(
+        domain=L.Domains.Numbers.REAL()))
 
     A.alias_is(Range(0, 15))
     B.constrain_subset(Range(5, 20))
@@ -277,7 +280,8 @@ def test_subset_is():
 
 
 def test_subset_is_expr():
-    A, B, C = params = times(3, lambda: Parameter(domain=L.Domains.Numbers.REAL()))
+    A, B, C = params = times(3, lambda: Parameter(
+        domain=L.Domains.Numbers.REAL()))
 
     context = ParameterOperatable.ReprContext()
     for p in params:
@@ -346,7 +350,8 @@ def test_less_obvious_contradiction_by_literal():
     G = A.get_graph()
     solver = DefaultSolver()
     with pytest.raises(ContradictionByLiteral):
-        repr_map, context = solver.simplify_symbolically(G, print_context=print_context)
+        repr_map, context = solver.simplify_symbolically(
+            G, print_context=print_context)
 
 
 def test_symmetric_inequality_correlated():
@@ -379,7 +384,8 @@ def test_simple_literal_folds_arithmetic(
     expr_type: type[Arithmetic], operands: Iterable[float], expected: float
 ):
     expected_result = Quantity_Interval_Disjoint.from_value(expected)
-    used_operands = [Quantity_Interval_Disjoint.from_value(o) for o in operands]
+    used_operands = [
+        Quantity_Interval_Disjoint.from_value(o) for o in operands]
 
     p0 = Parameter(units=dimensionless)
     p1 = Parameter(units=dimensionless)
@@ -451,7 +457,8 @@ def test_literal_folding_add_multiplicative():
         for m in (mul1, mul2)
     )
     assert any(
-        set(m.operands) == {rep_A, rep_B, Quantity_Interval_Disjoint.from_value(2)}
+        set(m.operands) == {rep_A, rep_B,
+                            Quantity_Interval_Disjoint.from_value(2)}
         for m in (mul1, mul2)
     )
 
@@ -507,7 +514,8 @@ def test_transitive_subset():
     C.alias_is(Range(0, 10))
 
     solver = DefaultSolver()
-    result, context = solver.simplify_symbolically(A.get_graph(), print_context=context)
+    result, context = solver.simplify_symbolically(
+        A.get_graph(), print_context=context)
     assert result.try_get_literal(A, allow_subset=True) == Range(0, 10)
 
 
@@ -525,10 +533,14 @@ def test_nested_additions():
     solver = DefaultSolver()
     result, _ = solver.simplify_symbolically(A.get_graph())
 
-    assert result.try_get_literal(A) == Quantity_Interval_Disjoint.from_value(1)
-    assert result.try_get_literal(B) == Quantity_Interval_Disjoint.from_value(1)
-    assert result.try_get_literal(C) == Quantity_Interval_Disjoint.from_value(2)
-    assert result.try_get_literal(D) == Quantity_Interval_Disjoint.from_value(3)
+    assert result.try_get_literal(
+        A) == Quantity_Interval_Disjoint.from_value(1)
+    assert result.try_get_literal(
+        B) == Quantity_Interval_Disjoint.from_value(1)
+    assert result.try_get_literal(
+        C) == Quantity_Interval_Disjoint.from_value(2)
+    assert result.try_get_literal(
+        D) == Quantity_Interval_Disjoint.from_value(3)
 
 
 def test_combined_add_and_multiply_with_ranges():
@@ -542,7 +554,8 @@ def test_combined_add_and_multiply_with_ranges():
 
     solver = DefaultSolver()
 
-    assert solver.inspect_get_known_supersets(C) == Range.from_center_rel(4, 0.01)
+    assert solver.inspect_get_known_supersets(
+        C) == Range.from_center_rel(4, 0.01)
 
 
 def test_voltage_divider_find_v_out_no_division():
@@ -628,7 +641,8 @@ def test_voltage_divider_find_resistances():
 
     solver = DefaultSolver()
     # FIXME: this test looks funky
-    assert solver.inspect_get_known_supersets(v_out) == Range(0.9 * P.V, 1 * P.V)
+    assert solver.inspect_get_known_supersets(
+        v_out) == Range(0.9 * P.V, 1 * P.V)
 
     # TODO: specify r_top (with tolerance), finish solving to find r_bottom
 
@@ -841,13 +855,16 @@ def test_jlcpcb_pick_powered_led():
     led.power.voltage.constrain_subset(L.Range(1.8 * P.volt, 5.5 * P.volt))
 
     solver = DefaultSolver()
-    children_mods = led.get_children_modules(direct_only=False, types=(Module,))
+    children_mods = led.get_children_modules(
+        direct_only=False, types=(Module,))
 
     pick_part_recursively(led, solver)
 
-    picked_parts = [mod for mod in children_mods if mod.has_trait(F.has_part_picked)]
+    picked_parts = [
+        mod for mod in children_mods if mod.has_trait(F.has_part_picked)]
     assert len(picked_parts) == 2
-    print([(p, p.get_trait(F.has_part_picked).get_part()) for p in picked_parts])
+    print([(p, p.get_trait(F.has_part_picked).get_part())
+          for p in picked_parts])
 
 
 @pytest.mark.parametrize(
@@ -904,7 +921,8 @@ def test_param_isolation():
 
     solver = DefaultSolver()
 
-    assert solver.inspect_get_known_supersets(X) == Range.from_center_rel(2, 0.02)
+    assert solver.inspect_get_known_supersets(
+        X) == Range.from_center_rel(2, 0.02)
 
 
 @pytest.mark.parametrize(
@@ -969,10 +987,12 @@ def test_graph_split():
         p.compact_repr(context)
 
     solver = DefaultSolver()
-    repr_map, _ = solver.simplify_symbolically(app.get_graph(), print_context=context)
+    repr_map, _ = solver.simplify_symbolically(
+        app.get_graph(), print_context=context)
 
     assert (
-        repr_map.repr_map[app.A].get_graph() is not repr_map.repr_map[app.B].get_graph()
+        repr_map.repr_map[app.A].get_graph(
+        ) is not repr_map.repr_map[app.B].get_graph()
     )
 
 
@@ -1174,7 +1194,8 @@ def test_ss_intersect():
             (True, False),
         ),
         (
-            [Multiply(Range(0, math.inf), Range(0, math.inf), Range(0, math.inf))],
+            [Multiply(Range(0, math.inf), Range(
+                0, math.inf), Range(0, math.inf))],
             [Multiply(Range(0, math.inf), Range(0, math.inf))],
             (False, False),
         ),
@@ -1235,7 +1256,8 @@ def test_implication():
     A.constrain_subset(Single(10))
 
     solver = DefaultSolver()
-    assert solver.inspect_get_known_supersets(B) == Range.from_center_rel(500, 0.1)
+    assert solver.inspect_get_known_supersets(
+        B) == Range.from_center_rel(500, 0.1)
 
 
 @pytest.mark.parametrize("A_value", [5, 10, 15])
@@ -1304,7 +1326,8 @@ def test_nested_fold_interval():
     A.alias_is(
         Add(
             Range.from_center_rel(1, 0.1),
-            Multiply(Range.from_center_rel(2, 0.1), Range.from_center_rel(3, 0.1)),
+            Multiply(Range.from_center_rel(2, 0.1),
+                     Range.from_center_rel(3, 0.1)),
         )
     )
 
@@ -1451,7 +1474,8 @@ def test_fold_correlated():
         p.compact_repr(context)
 
     solver = DefaultSolver()
-    repr_map, _ = solver.simplify_symbolically(C.get_graph(), print_context=context)
+    repr_map, _ = solver.simplify_symbolically(
+        C.get_graph(), print_context=context)
 
     is_lit = repr_map.try_get_literal(C, allow_subset=False)
     ss_lit = repr_map.try_get_literal(C, allow_subset=True)
