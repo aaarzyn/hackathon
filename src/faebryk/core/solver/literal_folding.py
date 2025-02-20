@@ -766,11 +766,11 @@ def fold(
         elif isinstance(expr, GreaterOrEqual):
             return fold_ge  # type: ignore
         elif isinstance(expr, GreaterThan):
-            # TODO implement
-            return lambda *args: None
+            return fold_gt
         elif isinstance(expr, LessOrEqual):
             return fold_le  # type: ignore
-
+        elif isinstance(expr, LessThan):
+            return fold_lt
         elif isinstance(expr, IsSubset):
             return fold_subset  # type: ignore
         # Sets

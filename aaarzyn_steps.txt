@@ -23,6 +23,30 @@ If results can be shared between solver runs, even better.
 [] split destructive algorithms from non-destructive algorithms
 [] avoid creating or checking too often for duplicate expressions
 
+
+The points are cumulative.
+
+Speeding up benchmark
+[] from 2x: 100 points
+[] from 5x: another 100 points
+[] from 10x: another 100 points
+[] from 20x: another 100 points
+[] from 50x: another 100 points
+[] from 100x: another 100 points (total 600)
+Finding (functional) bugs
+[] non solver test bug: 5 points
+[] library bug: 10 points
+[] solver test bug: 15 points
+[] mutator bug: 20 points
+[] math bug: 30 points
+Bonus points
+[] Speeding up non-solver/picker related code: 10 - 200 points
+[] Extending solver capabilities: 10 - 300 points
+
+Major goals:
+[] implement lt, le, gt, ge such that they all work
+[] speed up 2x or 5x
+
 66.56s w/ 4 cores, default
 58.46s w/ 4 cores, default
 47.40s w/ 4 cores, default
