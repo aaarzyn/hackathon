@@ -36,6 +36,11 @@ from faebryk.libs.util import (
     partition,
     try_or,
 )
+# start of profiling inits
+from faebryk.libs.test.times import Times
+timings = Times(name="Picker Timing",
+                multi_sample_strategy=Times.MultiSampleStrategy.AVG)
+# end of profiling inits
 
 NO_PROGRESS_BAR = ConfigFlag("NO_PROGRESS_BAR", default=False)
 
@@ -141,38 +146,44 @@ class does_not_require_picker_check(Parameter.TraitT.decless()):
 def pick_module_by_params(
     module: Module, solver: Solver, options: Iterable[PickerOption]
 ):
+    timings.add("pick_module_by_params_start")  # profiling
+
     if module.has_trait(F.has_part_picked):
         logger.debug(f"Ignoring already picked module: {module}")
         return
 
-    params = {
-        not_none(p.get_parent())[1]: p
-        for p in module.get_children(direct_only=True, types=Parameter)
-    }
+    with timings.context("Collect Parameters"):  # profiling
+        params = {
+            not_none(p.get_parent())[1]: p
+            for p in module.get_children(direct_only=True, types=Parameter)
+        }
+    with timings.context("Filter Options"):  # profiling
+        filtered_options = [
+            o for o in options if not o.filter or o.filter(module)]
 
-    filtered_options = [o for o in options if not o.filter or o.filter(module)]
-    predicates: dict[PickerOption, ParameterOperatable.BooleanLike] = {}
-    for o in filtered_options:
-        predicate_list: list[Predicate] = []
+    with timings.context("Generate Predicates"):  # profiling
+        predicates: dict[PickerOption, ParameterOperatable.BooleanLike] = {}
+        for o in filtered_options:
+            predicate_list: list[Predicate] = []
 
-        for k, v in (o.params or {}).items():
-            if not k.startswith("_"):
-                param = params[k]
-                predicate_list.append(Is(param, v))
+            for k, v in (o.params or {}).items():
+                if not k.startswith("_"):
+                    param = params[k]
+                    predicate_list.append(Is(param, v))
 
-        # No predicates, thus always valid option
-        if len(predicate_list) == 0:
-            predicates[o] = Or(True)
-            continue
+            # No predicates, thus always valid option
+            if len(predicate_list) == 0:
+                predicates[o] = Or(True)
+                continue
 
-        predicates[o] = And(*predicate_list)
+            predicates[o] = And(*predicate_list)
 
     if len(predicates) == 0:
         raise PickErrorParams(module, list(options), solver)
-
-    solve_result = solver.assert_any_predicate(
-        [(p, k) for k, p in predicates.items()], lock=True
-    )
+    with timings.context("Solver Assert"):  # profiling
+        solve_result = solver.assert_any_predicate(
+            [(p, k) for k, p in predicates.items()], lock=True
+        )
 
     # FIXME handle failure parameters
 
@@ -181,14 +192,16 @@ def pick_module_by_params(
         raise PickErrorParams(module, list(options), solver)
 
     _, option = next(iter(solve_result.true_predicates))
+    with timings.context("Attach Part"):
+        if option.pinmap:
+            module.add(F.can_attach_to_footprint_via_pinmap(option.pinmap))
 
-    if option.pinmap:
-        module.add(F.can_attach_to_footprint_via_pinmap(option.pinmap))
-
-    option.part.supplier.attach(module, option)
-    module.add(F.has_part_picked(option.part))
+        option.part.supplier.attach(module, option)
+        module.add(F.has_part_picked(option.part))
 
     logger.debug(f"Attached {option.part.partno} to {module}")
+    timings.add("pick_module_by_params_end")
+
     return option
 
 
@@ -319,17 +332,19 @@ def pick_topologically(
         names = sorted(p.get_full_name(types=True) for p in pickable_modules)
         logger.info(f"Picking parts for \n\t{'\n\t'.join(names)}")
 
-    def _get_candidates(_tree: Tree[Module]):
-        with timings.as_global("get candidates"):
-            # Rerun solver for new system
-            solver.update_superset_cache(*_tree)
-            candidates = list(get_candidates(_tree, solver).items())
-        if LOG_PICK_SOLVE:
-            logger.info(
-                "Candidates: \n\t"
-                f"{'\n\t'.join(f'{m}: {len(p)}' for m, p in candidates)}"
-            )
-        return candidates
+    timings.add("pick_topologically_start")  # profiling
+    with timings.context("Get Candidates"):
+        def _get_candidates(_tree: Tree[Module]):
+            with timings.as_global("get candidates"):
+                # Rerun solver for new system
+                solver.update_superset_cache(*_tree)
+                candidates = list(get_candidates(_tree, solver).items())
+            if LOG_PICK_SOLVE:
+                logger.info(
+                    "Candidates: \n\t"
+                    f"{'\n\t'.join(f'{m}: {len(p)}' for m, p in candidates)}"
+                )
+            return candidates
 
     def _update_progress(done: list[tuple[Module, Any]] | Module):
         if not progress:
@@ -344,49 +359,57 @@ def pick_topologically(
             progress.advance(m)
 
     timings.add("setup")
-
-    candidates = _get_candidates(tree)
-
-    # heuristic: pick all single part modules in one go
-    single_part_modules = [
-        (module, parts[0]) for module, parts in candidates if len(parts) == 1
-    ]
-    if single_part_modules:
-        with timings.as_global("pick single candidate modules"):
-            ok = pick_atomically(single_part_modules, solver)
-        if not ok:
-            # TODO: Track contradicting constraints back to modules
-            raise PickError(
-                "Could not pick all explicitly-specified parts."
-                "Likely contradicting constraints.",
-                module=(m for m, _ in single_part_modules),  # type: ignore # TODO
-            )
-        _update_progress(single_part_modules)
-
-        tree = update_pick_tree(tree)
+    with timings.context("Get Initial Candidates"):
         candidates = _get_candidates(tree)
 
+    # heuristic: pick all single part modules in one go
+    with timings.context("Pick Single Part Modules"):
+        single_part_modules = [
+            (module, parts[0]) for module, parts in candidates if len(parts) == 1
+        ]
+        if single_part_modules:
+            with timings.as_global("pick single candidate modules"):
+                ok = pick_atomically(single_part_modules, solver)
+            if not ok:
+                # TODO: Track contradicting constraints back to modules
+                raise PickError(
+                    "Could not pick all explicitly-specified parts."
+                    "Likely contradicting constraints.",
+                    # type: ignore # TODO
+                    module=(m for m, _ in single_part_modules),
+                )
+            _update_progress(single_part_modules)
+
+            tree = update_pick_tree(tree)
+            candidates = _get_candidates(tree)
+
     # heuristic: try pick first candidate for rest
-    with timings.as_global("fast-pick"):
+    # with timings.as_global("fast-pick"): og profiling
+    with timings.context("Fast Pick"):  # new profiling
         ok = pick_atomically([(m, p[0]) for m, p in candidates], solver)
     if ok:
         _update_progress(candidates)
-        logger.info(f"Fast-picked parts in {timings.get_formatted('fast-pick')}")
+        logger.info(
+            f"Fast-picked parts in {timings.get_formatted('fast-pick')}")
         return
     logger.warning("Could not pick all parts atomically")
 
     logger.warning("Falling back to extremely slow picking one by one")
-    with timings.as_global("slow-pick", context=True):
+    # with timings.as_global("slow-pick", context=True): old profiling
+    with timings.context("Slow Pick"):
         for module in tree:
             parts = _get_candidates(Tree({module: Tree()}))[0][1]
             filter_by_module_params_and_attach(module, parts, solver)
             _update_progress(module)
 
     logger.info(f"Slow-picked parts in {timings.get_formatted('slow-pick')}")
-
+    timings.add("pick_topologically_end")
 
 # TODO should be a Picker
+
+
 def pick_part_recursively(module: Module, solver: Solver):
+    timings.add("pick_part_recursively_start")
     pick_tree = get_pick_tree(module)
     if LOG_PICK_SOLVE:
         logger.info(f"Pick tree:\n{pick_tree.pretty()}")
@@ -406,3 +429,4 @@ def pick_part_recursively(module: Module, solver: Solver):
                 f"Params:\n{indent(m.pretty_params(solver), prefix=' '*4)}"
             )
         raise
+    timings.add("pick_part_recursively_end")
