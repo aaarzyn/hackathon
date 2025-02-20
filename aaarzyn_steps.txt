@@ -1,0 +1,35 @@
+codespaces every test run which passed cases (128pass/8xfail)
+
+Algorithmic: Picker - picker.py:pick_topologically
+The solver itself is not super slow, but it's called a lot during picking. 
+There are ways to reduce the number of solver calls.
+
+[] picking parts by solver instead of looping through candidates
+[] picking parts in smarter sequences (e.g sort by parameter variance)
+[] picking parts in parallel, by finding independent module groups
+
+Implementation: Mutator - mutator.py
+Mutation by copy is very expensive if done for large graphs.
+
+[] improve Expression/Parameter construction speed
+[] avoid graph copies if not necessary
+[x] switch to mutable graph for intermediate stages of solver - completed, step 1
+
+Mathematical: Solver - analytical.py
+Every solver algorithm/iteration costs time. 
+If algorithms can reach most strong expressions faster, fewer iterations are needed. 
+If results can be shared between solver runs, even better.
+
+[] split destructive algorithms from non-destructive algorithms
+[] avoid creating or checking too often for duplicate expressions
+
+66.56s w/ 4 cores, default
+58.46s w/ 4 cores, default
+47.40s w/ 4 cores, default
+
+# step 1, mutable graphs through caching in mutator
+39.26s w/ 4 cores, graph caching
+39.24s w/ 4 cores, graph caching
+39.88s w/ 4 cores, graph caching
+
+

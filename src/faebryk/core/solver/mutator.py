@@ -95,12 +95,14 @@ class Mutator:
         repr_map: REPR_MAP | None = None,
     ) -> None:
         self._G: set[Graph] = set(Gs)
+        self._cached_G = None
         self.print_context = print_context
 
         if not iteration_repr_map:
             iteration_repr_map = {}
 
-        self._starting_operables = set(self.nodes_of_type(include_terminated=True))
+        self._starting_operables = set(
+            self.nodes_of_type(include_terminated=True))
 
         self._last_run_repr_map = iteration_repr_map
         self._last_run_operables = set(iteration_repr_map.values())
@@ -150,12 +152,16 @@ class Mutator:
     @property
     def G(self) -> set[Graph]:
         # Handles C++ graph shenanigans on move
+        if self._cached_G is not None:
+            return self._cached_G
         g = self._G
-        if all(g.node_count > 0 for g in g):
+        if all(graph.node_count > 0 for graph in g):
+            self._cached_G = g
             return g
         # Handle graph merge
         gs = get_graphs(self._starting_operables)
         self._G = set(gs)
+        self._G_cached_G = self._G
         return self._G
 
     def has_been_mutated(self, po: ParameterOperatable) -> bool:
@@ -186,7 +192,8 @@ class Mutator:
         """
         # TODO not sure this is the best way to handle ghost exprs
         if po in self.transformations.mutated:
-            self.transformations.created[self.transformations.mutated[po]] = [po]
+            self.transformations.created[self.transformations.mutated[po]] = [
+                po]
 
         self.transformations.mutated[po] = new_po
 
@@ -290,7 +297,8 @@ class Mutator:
                 expression_factory, expr, operands, soft_mutate
             )
 
-        copy_only = expression_factory is type(expr) and operands == expr.operands
+        copy_only = expression_factory is type(
+            expr) and operands == expr.operands
         if not copy_only and not ignore_existing:
             assert issubclass(expression_factory, CanonicalExpression)
             exists = find_congruent_expression(
@@ -299,7 +307,8 @@ class Mutator:
             if exists is not None:
                 return self._mutate(expr, self.get_copy(exists))
 
-        constrain = isinstance(expr, ConstrainableExpression) and expr.constrained
+        constrain = isinstance(
+            expr, ConstrainableExpression) and expr.constrained
         new_expr = self._create_expression(
             expression_factory,
             *operands,
@@ -431,7 +440,8 @@ class Mutator:
         """
         return self.mutate_expression(
             expr,
-            operands=[operand_mutator(i, op) for i, op in enumerate(expr.operands)],
+            operands=[operand_mutator(i, op)
+                      for i, op in enumerate(expr.operands)],
             expression_factory=expression_factory,
             ignore_existing=ignore_existing,
         )
@@ -601,7 +611,8 @@ class Mutator:
         added = post_mut_nodes.difference(
             self._starting_operables, self.transformations.created
         )
-        removed_compact = [op.compact_repr(self.print_context) for op in removed]
+        removed_compact = [op.compact_repr(
+            self.print_context) for op in removed]
         added_compact = [op.compact_repr(self.print_context) for op in added]
         assert not removed, (
             f"Mutator {self.G, self.algo.name} untracked removed "
@@ -623,7 +634,8 @@ class Mutator:
             self.transformations.created, self.transformations.mutated.values()
         )
         if non_registered:
-            compact = (op.compact_repr(self.print_context) for op in non_registered)
+            compact = (op.compact_repr(self.print_context)
+                       for op in non_registered)
             graphs = get_graphs(non_registered)
             # FIXME: this is currently hit during legitimate build
             with downgrade(AssertionError, logger=logger, to_level=logging.DEBUG):
@@ -706,7 +718,8 @@ class Mutator:
         elif created_only:
             out = {n for n in self.transformations.created if isinstance(n, t)}
         else:
-            out = {n for G in self.G for n in GraphFunctions(G).nodes_of_type(t)}
+            out = {n for G in self.G for n in GraphFunctions(
+                G).nodes_of_type(t)}
 
         if not include_terminated:
             out = {
@@ -772,7 +785,8 @@ class Mutator:
     def _get_literal_subsets(self, new_only: bool = True):
         subsets: set[CanonicalExpression]
         subsets = set(
-            self.nodes_of_type(IsSubset, new_only=new_only, include_terminated=True)
+            self.nodes_of_type(IsSubset, new_only=new_only,
+                               include_terminated=True)
         )
 
         if new_only:
@@ -781,10 +795,12 @@ class Mutator:
                 new_lit = try_extract_literal(new, allow_subset=True)
                 if new_lit is None:
                     continue
-                old_lits = {try_extract_literal(o, allow_subset=True) for o in olds}
+                old_lits = {try_extract_literal(
+                    o, allow_subset=True) for o in olds}
                 if old_lits == {new_lit}:
                     continue
-                subsets.update(new.get_operations(IsSubset, constrained_only=True))
+                subsets.update(new.get_operations(
+                    IsSubset, constrained_only=True))
             subsets.update(self.mutated_since_last_run)
 
         return (expr for expr in subsets if is_subset_literal(expr))
@@ -837,7 +853,8 @@ class Mutator:
 
         for op, from_ops in created_ops.items():
             key = "new"
-            key_from_ops = " \n  ".join(o.compact_repr(context_old) for o in from_ops)
+            key_from_ops = " \n  ".join(
+                o.compact_repr(context_old) for o in from_ops)
             key_from_ops = f"  {key_from_ops}"
             value = op.compact_repr(context_new)
             if is_alias_is_literal(op) or is_subset_literal(op):
@@ -888,7 +905,8 @@ class Mutator:
             printed.add(s)
             rows.append((old, new))
 
-        merged = groupby(self.transformations.mutated.items(), key=lambda t: t[1])
+        merged = groupby(self.transformations.mutated.items(),
+                         key=lambda t: t[1])
         non_single_merge = {k: v for k, v in merged.items() if len(v) > 1}
         for d, sds in non_single_merge.items():
             for s, _ in sds:
@@ -1011,7 +1029,8 @@ class Mutator:
         ) -> SolverLiteral | None:
             if param not in self.repr_map:
                 return None
-            lit = try_extract_literal(self.repr_map[param], allow_subset=allow_subset)
+            lit = try_extract_literal(
+                self.repr_map[param], allow_subset=allow_subset)
             if lit is None:
                 return None
             if isinstance(lit, Quantity_Set):
